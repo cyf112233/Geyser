@@ -30,6 +30,7 @@ import org.cloudburstmc.math.vector.Vector2f;
 import org.cloudburstmc.protocol.bedrock.BedrockDisconnectReasons;
 import org.cloudburstmc.protocol.bedrock.codec.BedrockCodec;
 import org.cloudburstmc.protocol.bedrock.codec.compat.BedrockCompat;
+import org.cloudburstmc.protocol.bedrock.codec.v819.Bedrock_v819;
 import org.cloudburstmc.protocol.bedrock.data.ExperimentData;
 import org.cloudburstmc.protocol.bedrock.data.PacketCompressionAlgorithm;
 import org.cloudburstmc.protocol.bedrock.data.ResourcePackType;
@@ -118,14 +119,10 @@ public class UpstreamPacketHandler extends LoggingPacketHandler {
     }
 
     private boolean setCorrectCodec(int protocolVersion) {
-        // 直接伪造一个BedrockCodec，协议号为客户端发来的protocolVersion
         try {
-            // 获取最新模板
-            Class<?> bedrockV819Class = Class.forName("org.cloudburstmc.protocol.bedrock.codec.v819.Bedrock_v819");
-            Object baseCodec = bedrockV819Class.getDeclaredField("CODEC").get(null);
-            Object builder = baseCodec.getClass().getMethod("toBuilder").invoke(baseCodec);
-            builder.getClass().getMethod("protocolVersion", int.class).invoke(builder, protocolVersion);
-            Object newCodec = builder.getClass().getMethod("build").invoke(builder);
+            BedrockCodec newCodec = Bedrock_v819.CODEC.toBuilder()
+                .protocolVersion(protocolVersion)
+                .build();
             session.getUpstream().getSession().setCodec(newCodec);
             return true;
         } catch (Exception e) {
