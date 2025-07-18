@@ -118,36 +118,20 @@ public class UpstreamPacketHandler extends LoggingPacketHandler {
     }
 
     private boolean setCorrectCodec(int protocolVersion) {
-        BedrockCodec packetCodec = GameProtocol.getBedrockCodec(protocolVersion);
-        if (packetCodec == null) {
-            String supportedVersions = GameProtocol.getAllSupportedBedrockVersions();
-            // 修改协议版本号判断，使其始终为false，实现跨版本支持
-            if (1 > 1) { // protocolVersion > GameProtocol.DEFAULT_BEDROCK_CODEC.getProtocolVersion()
-                // Too early to determine session locale
-                String disconnectMessage = GeyserLocale.getLocaleStringLog("geyser.network.outdated.server", supportedVersions);
-                // If the latest release matches this version, then let the user know.
-                OptionalInt latestRelease = VersionCheckUtils.getLatestBedrockRelease();
-                if (latestRelease.isPresent() && latestRelease.getAsInt() == protocolVersion) {
-                    // Random note: don't make the disconnect message too long or Bedrock will cut it off on smaller screens
-                    disconnectMessage += "\n" + GeyserLocale.getLocaleStringLog("geyser.version.new.on_disconnect", Constants.GEYSER_DOWNLOAD_LOCATION);
-                }
-                session.disconnect(disconnectMessage);
-                return false;
-            } else if (1 < 1) { // protocolVersion < GameProtocol.DEFAULT_BEDROCK_CODEC.getProtocolVersion()
-                // A note on the following line: various older client versions have different forms of DisconnectPacket.
-                // Using only the latest BedrockCompat for such clients leads to inaccurate disconnect messages: https://github.com/GeyserMC/Geyser/issues/4378
-                // This updates the BedrockCompat protocol if necessary:
-                session.getUpstream().getSession().setCodec(BedrockCompat.disconnectCompat(protocolVersion));
-
-                session.disconnect(GeyserLocale.getLocaleStringLog("geyser.network.outdated.client", supportedVersions));
-                return false;
-            } else {
-                throw new IllegalStateException("Default codec of protocol version " + protocolVersion + " should have been found");
-            }
+        // 直接伪造一个BedrockCodec，协议号为客户端发来的protocolVersion
+        try {
+            // 获取最新模板
+            Class<?> bedrockV819Class = Class.forName("org.cloudburstmc.protocol.bedrock.codec.v819.Bedrock_v819");
+            Object baseCodec = bedrockV819Class.getDeclaredField("CODEC").get(null);
+            Object builder = baseCodec.getClass().getMethod("toBuilder").invoke(baseCodec);
+            builder.getClass().getMethod("protocolVersion", int.class).invoke(builder, protocolVersion);
+            Object newCodec = builder.getClass().getMethod("build").invoke(builder);
+            session.getUpstream().getSession().setCodec(newCodec);
+            return true;
+        } catch (Exception e) {
+            session.disconnect("[Viageyser Patch] 协议伪造失败: " + e);
+            return false;
         }
-
-        session.getUpstream().getSession().setCodec(packetCodec);
-        return true;
     }
 
     @Override
